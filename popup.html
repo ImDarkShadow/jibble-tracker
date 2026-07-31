@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jibble Work Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="popup-body">
+  <div class="popup-container">
+
+    <!-- Header -->
+    <header class="popup-header">
+      <div class="brand">
+        <div class="brand-icon">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 16 14"></polyline>
+          </svg>
+        </div>
+        <div class="brand-title">
+          <h1>Jibble Tracker</h1>
+          <span class="status-badge" id="sync-status" role="status" aria-live="polite">—</span>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <button id="refresh-btn" class="icon-btn" title="Refresh data" aria-label="Refresh data">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M23 4v6h-6"></path>
+            <path d="M1 20v-6h6"></path>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+          </svg>
+        </button>
+
+        <button id="expand-btn" class="btn-dashboard" title="Open full dashboard" aria-label="Open full dashboard">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <polyline points="15 3 21 3 21 9"></polyline>
+            <polyline points="9 21 3 21 3 15"></polyline>
+            <line x1="21" y1="3" x2="14" y2="10"></line>
+            <line x1="3" y1="21" x2="10" y2="14"></line>
+          </svg>
+          Dashboard
+        </button>
+      </div>
+    </header>
+
+    <!-- Month & Theme Bar -->
+    <div class="month-selector-bar">
+      <label for="popup-month-select">
+        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+          <line x1="16" y1="2" x2="16" y2="6"></line>
+          <line x1="8" y1="2" x2="8" y2="6"></line>
+          <line x1="3" y1="10" x2="21" y2="10"></line>
+        </svg>
+        Period
+      </label>
+      <input type="month" id="popup-month-select" class="month-input" aria-label="Select month">
+    </div>
+
+    <!-- Error / Auth Notice -->
+    <div id="popup-notice" class="popup-notice hidden" role="alert"></div>
+
+    <!-- Stats Body -->
+    <div class="summary-section">
+
+      <!-- Monthly -->
+      <div>
+        <div class="section-title">Monthly</div>
+        <div class="cards-grid">
+
+          <!-- Monthly Work -->
+          <div class="stat-card" id="card-month-work" role="region" aria-label="Monthly work">
+            <div class="card-header">
+              <span class="card-label">Work</span>
+              <span class="status-indicator" id="ind-month-work" aria-label="Work status">—</span>
+            </div>
+            <div class="actual-val tabular" id="val-month-work-actual" aria-label="Actual monthly work">—</div>
+            <div class="card-metrics">
+              <div class="metric">
+                <span class="m-label">Required</span>
+                <span class="m-val tabular" id="val-month-work-req">—</span>
+              </div>
+              <div class="metric">
+                <span class="m-label">Diff</span>
+                <span class="m-val diff tabular" id="val-month-work-diff">—</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Monthly Break -->
+          <div class="stat-card" id="card-month-break" role="region" aria-label="Monthly break">
+            <div class="card-header">
+              <span class="card-label">Break</span>
+              <span class="status-indicator" id="ind-month-break" aria-label="Break status">—</span>
+            </div>
+            <div class="actual-val tabular" id="val-month-break-actual">—</div>
+            <div class="card-metrics">
+              <div class="metric">
+                <span class="m-label">Allowed</span>
+                <span class="m-val tabular" id="val-month-break-req">—</span>
+              </div>
+              <div class="metric">
+                <span class="m-label">Diff</span>
+                <span class="m-val diff tabular" id="val-month-break-diff">—</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Monthly Total -->
+          <div class="stat-card highlight-card" id="card-month-total" role="region" aria-label="Monthly total">
+            <div class="card-header">
+              <span class="card-label">Total</span>
+              <span class="status-indicator" id="ind-month-total" aria-label="Total status">—</span>
+            </div>
+            <div class="actual-val tabular" id="val-month-total-actual">—</div>
+            <div class="card-metrics">
+              <div class="metric">
+                <span class="m-label">Required</span>
+                <span class="m-val tabular" id="val-month-total-req">—</span>
+              </div>
+              <div class="metric">
+                <span class="m-label">Diff</span>
+                <span class="m-val diff tabular" id="val-month-total-diff">—</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Today -->
+      <div>
+        <div class="section-title">Today</div>
+        <div class="cards-grid">
+
+          <!-- Today Work -->
+          <div class="stat-card" id="card-today-work" role="region" aria-label="Today's work">
+            <div class="card-header">
+              <span class="card-label">Work</span>
+              <span class="status-indicator" id="ind-today-work">—</span>
+            </div>
+            <div class="actual-val tabular" id="val-today-work-actual">—</div>
+            <div class="card-metrics">
+              <div class="metric">
+                <span class="m-label">Required</span>
+                <span class="m-val tabular" id="val-today-work-req">—</span>
+              </div>
+              <div class="metric">
+                <span class="m-label">Diff</span>
+                <span class="m-val diff tabular" id="val-today-work-diff">—</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Today Break -->
+          <div class="stat-card" id="card-today-break" role="region" aria-label="Today's break">
+            <div class="card-header">
+              <span class="card-label">Break</span>
+              <span class="status-indicator" id="ind-today-break">—</span>
+            </div>
+            <div class="actual-val tabular" id="val-today-break-actual">—</div>
+            <div class="card-metrics">
+              <div class="metric">
+                <span class="m-label">Allowed</span>
+                <span class="m-val tabular" id="val-today-break-req">—</span>
+              </div>
+              <div class="metric">
+                <span class="m-label">Diff</span>
+                <span class="m-val diff tabular" id="val-today-break-diff">—</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Today Total -->
+          <div class="stat-card highlight-card" id="card-today-total" role="region" aria-label="Today's total">
+            <div class="card-header">
+              <span class="card-label">Total</span>
+              <span class="status-indicator" id="ind-today-total">—</span>
+            </div>
+            <div class="actual-val tabular" id="val-today-total-actual">—</div>
+            <div class="card-metrics">
+              <div class="metric">
+                <span class="m-label">Required</span>
+                <span class="m-val tabular" id="val-today-total-req">—</span>
+              </div>
+              <div class="metric">
+                <span class="m-label">Diff</span>
+                <span class="m-val diff tabular" id="val-today-total-diff">—</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div><!-- /summary-section -->
+  </div><!-- /popup-container -->
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>
