@@ -12,9 +12,32 @@ function cssVar(name) {
  */
 function setSafeHTML(targetEl, htmlString) {
   if (!targetEl) return;
+  const tagName = targetEl.tagName ? targetEl.tagName.toLowerCase() : '';
   const parser = new DOMParser();
-  const doc = parser.parseFromString(htmlString, 'text/html');
-  targetEl.replaceChildren(...doc.body.childNodes);
+
+  if (tagName === 'tbody' || tagName === 'tfoot' || tagName === 'thead') {
+    const doc = parser.parseFromString(`<table><${tagName}>${htmlString}</${tagName}></table>`, 'text/html');
+    const container = doc.querySelector(tagName);
+    if (container) {
+      targetEl.replaceChildren(...container.childNodes);
+      return;
+    }
+  } else if (tagName === 'tr') {
+    const doc = parser.parseFromString(`<table><tbody><tr>${htmlString}</tr></tbody></table>`, 'text/html');
+    const tr = doc.querySelector('tr');
+    if (tr) {
+      targetEl.replaceChildren(...tr.childNodes);
+      return;
+    }
+  }
+
+  const doc = parser.parseFromString(`<div>${htmlString}</div>`, 'text/html');
+  const div = doc.body ? doc.body.firstElementChild : null;
+  if (div) {
+    targetEl.replaceChildren(...div.childNodes);
+  } else if (doc.body) {
+    targetEl.replaceChildren(...doc.body.childNodes);
+  }
 }
 
 /**

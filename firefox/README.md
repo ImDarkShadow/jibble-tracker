@@ -1,6 +1,6 @@
 # Work Tracker for Jibble
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue)
+![Version](https://img.shields.io/badge/version-1.0-blue)
 ![Manifest V3](https://img.shields.io/badge/manifest-V3-purple)
 ![Browsers](https://img.shields.io/badge/browsers-Chrome%20%7C%20Firefox%20%7C%20Brave-orange)
 ![License](https://img.shields.io/badge/license-AGPL--3.0-green)

@@ -63,7 +63,9 @@ export async function getJibbleToken() {
         // 3. Fallback: Trigger silent background session refresh if enabled
         const settings = await getSettings();
         if (settings.autoRefreshSession !== false && extApi.runtime && extApi.runtime.sendMessage) {
-          extApi.runtime.sendMessage({ type: "SILENT_REFRESH_SESSION" });
+          extApi.runtime.sendMessage({ type: "SILENT_REFRESH_SESSION" }, () => {
+            const _ = extApi.runtime.lastError;
+          });
         }
 
         resolve(null);

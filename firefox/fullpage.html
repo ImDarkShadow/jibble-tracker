@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jibble Work Tracker — Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="full-body">
+
+  <!-- Toast container -->
+  <div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="true"></div>
+
+  <div class="dashboard-container">
+
+    <!-- ── Header ── -->
+    <header class="dash-header">
+      <div class="header-left">
+        <div class="dash-logo" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 16 14"></polyline>
+          </svg>
+        </div>
+        <div>
+          <h1 class="dash-title">Work Tracker for Jibble</h1>
+          <p class="dash-subtitle">Attendance analytics, target tracking &amp; off-day management</p>
+        </div>
+      </div>
+
+      <div class="header-right">
+        <!-- Theme Toggle -->
+        <div class="theme-toggle" role="group" aria-label="Color theme">
+          <button class="theme-toggle-btn" data-theme-val="light" title="Light theme">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+            Light
+          </button>
+          <button class="theme-toggle-btn active" data-theme-val="dark" title="Dark theme">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+            Dark
+          </button>
+          <button class="theme-toggle-btn" data-theme-val="system" title="Follow system">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+            System
+          </button>
+        </div>
+
+        <!-- Month picker -->
+        <div class="dash-month-picker">
+          <label for="dash-month-select">Month</label>
+          <input type="month" id="dash-month-select" class="month-input-lg" aria-label="Select month">
+        </div>
+
+        <button id="dash-refresh-btn" class="btn-secondary-dash" aria-label="Refresh data">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+          </svg>
+          Refresh
+        </button>
+      </div>
+    </header>
+
+    <!-- Expiry / Notice Banner -->
+    <div id="dash-notice-banner" class="dash-notice-banner error hidden" role="alert"></div>
+
+    <!-- ── KPI Cards ── -->
+    <section aria-label="Key metrics" class="kpi-grid">
+
+      <!-- Completion ring -->
+      <div class="kpi-card">
+        <div class="kpi-header">
+          <span class="kpi-title">Total Completion</span>
+          <svg class="kpi-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+        </div>
+        <div class="kpi-body" id="kpi-ring-container" aria-label="Work completion ring"></div>
+      </div>
+
+      <!-- Work balance -->
+      <div class="kpi-card">
+        <div class="kpi-header">
+          <span class="kpi-title">Work Balance</span>
+          <svg class="kpi-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+        </div>
+        <div class="kpi-stat">
+          <div class="kpi-value tabular" id="kpi-work-actual">—</div>
+          <div class="kpi-sub">Target: <span id="kpi-work-req">—</span></div>
+          <div class="kpi-tag" id="kpi-work-diff-tag">—</div>
+        </div>
+      </div>
+
+      <!-- Break usage -->
+      <div class="kpi-card">
+        <div class="kpi-header">
+          <span class="kpi-title">Break Usage</span>
+          <svg class="kpi-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 8h1a4 4 0 0 1 0 8h-1"></path><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path><line x1="6" y1="1" x2="6" y2="4"></line><line x1="10" y1="1" x2="10" y2="4"></line><line x1="14" y1="1" x2="14" y2="4"></line></svg>
+        </div>
+        <div class="kpi-stat">
+          <div class="kpi-value tabular" id="kpi-break-actual">—</div>
+          <div class="kpi-sub">Allowed: <span id="kpi-break-req">—</span></div>
+          <div class="kpi-tag" id="kpi-break-diff-tag">—</div>
+        </div>
+      </div>
+
+      <!-- Net total -->
+      <div class="kpi-card">
+        <div class="kpi-header">
+          <span class="kpi-title">Net Total</span>
+          <svg class="kpi-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+        </div>
+        <div class="kpi-stat">
+          <div class="kpi-value tabular" id="kpi-total-actual">—</div>
+          <div class="kpi-sub">Required: <span id="kpi-total-req">—</span></div>
+          <div class="kpi-tag" id="kpi-total-diff-tag">—</div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ── Chart ── -->
+    <section aria-label="Daily chart" class="dash-section card">
+      <div class="section-header">
+        <h2>Monthly Work vs Target</h2>
+        <span class="section-subtitle">Daily actual hours compared against required schedule</span>
+      </div>
+      <div id="daily-chart-container" class="chart-container-box"></div>
+    </section>
+
+    <!-- ── Settings ── -->
+    <section aria-label="Configuration" class="settings-grid">
+
+      <!-- Work config -->
+      <div class="card">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+          <h3>Work Configuration</h3>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label for="cfg-work-hours">Daily work target (h)</label>
+            <input type="number" id="cfg-work-hours" value="8" min="0.5" max="24" step="0.5">
+          </div>
+          <div class="form-group flex-1">
+            <label for="cfg-break-hours">Daily break allowance (h)</label>
+            <input type="number" id="cfg-break-hours" value="1" min="0" max="12" step="0.25">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Working weekdays</label>
+          <div class="checkbox-group">
+            <label><input type="checkbox" name="weekday" value="Mon" checked> Mon</label>
+            <label><input type="checkbox" name="weekday" value="Tue" checked> Tue</label>
+            <label><input type="checkbox" name="weekday" value="Wed" checked> Wed</label>
+            <label><input type="checkbox" name="weekday" value="Thu" checked> Thu</label>
+            <label><input type="checkbox" name="weekday" value="Fri" checked> Fri</label>
+            <label><input type="checkbox" name="weekday" value="Sat"> Sat</label>
+            <label><input type="checkbox" name="weekday" value="Sun"> Sun</label>
+          </div>
+        </div>
+
+        <button id="save-work-config-btn" class="btn-primary">Save work settings</button>
+      </div>
+
+      <!-- Saturday config -->
+      <div class="card">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+          <h3>Saturday Schedule</h3>
+        </div>
+
+        <div class="form-group">
+          <label for="cfg-sat-mode">Saturday schedule</label>
+          <select id="cfg-sat-mode">
+            <option value="every_off">Every Saturday — Off</option>
+            <option value="every_working">Every Saturday — Working</option>
+            <option value="alt_1_3_work">1st &amp; 3rd Saturday working</option>
+            <option value="alt_2_4_work">2nd &amp; 4th Saturday working</option>
+            <option value="alt_1_3_off">1st &amp; 3rd Saturday off</option>
+            <option value="alt_2_4_off">2nd &amp; 4th Saturday off</option>
+            <option value="ref_date">Bi-weekly from reference date</option>
+          </select>
+        </div>
+
+        <div class="form-group" id="ref-date-group" style="display:none;">
+          <label for="cfg-ref-date">Reference Saturday date</label>
+          <input type="date" id="cfg-ref-date">
+        </div>
+
+        <div class="half-day-box">
+          <div class="checkbox-group">
+            <label>
+              <input type="checkbox" id="cfg-half-day-enable">
+              Half-day Saturdays
+            </label>
+          </div>
+          <div class="form-row" id="half-day-controls" style="display:none; margin-top: 10px;">
+            <div class="form-group flex-1">
+              <label for="cfg-sat-work-hours">Saturday work (h)</label>
+              <input type="number" id="cfg-sat-work-hours" value="4" min="1" max="12" step="0.5">
+            </div>
+            <div class="form-group flex-1">
+              <label for="cfg-sat-break-hours">Saturday break (h)</label>
+              <input type="number" id="cfg-sat-break-hours" value="0.5" min="0" max="4" step="0.25">
+            </div>
+          </div>
+        </div>
+
+        <button id="save-sat-config-btn" class="btn-primary" style="margin-top:12px;">Save Saturday settings</button>
+      </div>
+
+      <!-- Account & API Settings -->
+      <div class="card">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+          <h3>Account &amp; API Settings</h3>
+        </div>
+
+        <div class="form-group">
+          <label for="cfg-person-id">Jibble Person ID (prsid)</label>
+          <input type="text" id="cfg-person-id" placeholder="Auto-detected from Jibble login">
+          <span style="font-size:11px; color:var(--text-tertiary); margin-top:2px;">Auto-detected from Jibble login or customized manually.</span>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label for="cfg-period-mode">Default Tracking Cycle</label>
+            <select id="cfg-period-mode">
+              <option value="month">Monthly (Default)</option>
+              <option value="bi_weekly">Bi-Weekly</option>
+            </select>
+          </div>
+          <div class="form-group flex-1">
+            <label for="cfg-month-calc-mode">Month Target Scope</label>
+            <select id="cfg-month-calc-mode">
+              <option value="full">Full Month (Entire Month Target)</option>
+              <option value="mtd">Month-to-Date (Elapsed Days Only)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label for="cfg-badge-metric">Toolbar Icon Badge</label>
+            <select id="cfg-badge-metric">
+              <option value="total">Total Time (Work+Break)</option>
+              <option value="work">Work Time Only</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="cfg-app-version">X-Jibble-App-Version Header</label>
+          <input type="text" id="cfg-app-version" placeholder="2.81.3">
+        </div>
+
+        <div class="checkbox-group" style="margin-bottom:12px; flex-direction:column; gap:8px;">
+          <label>
+            <input type="checkbox" id="cfg-auto-refresh-session" checked>
+            Auto-refresh session silently when expired
+          </label>
+          <label>
+            <input type="checkbox" id="cfg-notify-target-met" checked>
+            Notify when daily work target is reached
+          </label>
+        </div>
+
+        <button id="save-api-config-btn" class="btn-primary" style="margin-top:4px;">Save Preferences &amp; API Settings</button>
+      </div>
+
+    </section>
+
+    <!-- ── Off Days & Holidays ── -->
+    <section aria-label="Off days and holidays" class="dash-section card">
+      <div class="table-header-flex">
+        <div class="section-header">
+          <h2>Off Days &amp; Holidays</h2>
+          <span class="section-subtitle">Custom holidays alongside auto-detected weekends and off Saturdays</span>
+        </div>
+        <button id="open-add-holiday-modal" class="btn-action-primary" aria-label="Add custom holiday">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          Add Holiday
+        </button>
+      </div>
+
+      <div class="table-container">
+        <table class="data-table" aria-label="Holiday list">
+          <thead>
+            <tr>
+              <th scope="col">Date</th>
+              <th scope="col">Day</th>
+              <th scope="col">Name</th>
+              <th scope="col">Type</th>
+              <th scope="col">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="holiday-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ── Daily Log ── -->
+    <section aria-label="Daily time log" class="dash-section card">
+      <div class="table-header-flex">
+        <div class="section-header">
+          <h2>Daily Log</h2>
+          <span class="section-subtitle">Calendar day breakdown — required vs actual work &amp; breaks</span>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button id="print-report-btn" class="btn-secondary-dash" aria-label="Print or export PDF report">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+            Print / PDF
+          </button>
+          <button id="export-csv-btn" class="btn-export" aria-label="Export data as CSV">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            Export CSV
+          </button>
+        </div>
+      </div>
+
+      <div class="table-container">
+        <table class="data-table log-table" aria-label="Daily time log">
+          <thead>
+            <tr>
+              <th scope="col">Date</th>
+              <th scope="col">Day</th>
+              <th scope="col">Type</th>
+              <th scope="col">Req Work</th>
+              <th scope="col">Act Work</th>
+              <th scope="col">Work Diff</th>
+              <th scope="col">Allowed Brk</th>
+              <th scope="col">Act Break</th>
+              <th scope="col">Break Diff</th>
+              <th scope="col">Req Total</th>
+              <th scope="col">Act Total</th>
+              <th scope="col">Total Diff</th>
+            </tr>
+          </thead>
+          <tbody id="time-log-tbody"></tbody>
+          <tfoot id="time-log-tfoot"></tfoot>
+        </table>
+      </div>
+    </section>
+
+  </div><!-- /dashboard-container -->
+
+  <!-- ── Holiday Modal ── -->
+  <div id="holiday-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="modal-title">Add Holiday</h3>
+        <button id="close-holiday-modal" class="modal-close-btn" aria-label="Close dialog">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="modal-holiday-id">
+        <div class="form-group">
+          <label for="modal-holiday-date">Date</label>
+          <input type="date" id="modal-holiday-date" required>
+        </div>
+        <div class="form-group">
+          <label for="modal-holiday-name">Holiday name</label>
+          <input type="text" id="modal-holiday-name" placeholder="e.g. Independence Day" required>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="cancel-holiday-modal-btn" class="btn-secondary" type="button">Cancel</button>
+        <button id="save-holiday-modal-btn" class="btn-primary" type="button" style="width:auto;">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="fullpage.js"></script>
+</body>
+</html>

@@ -92,6 +92,8 @@ document.addEventListener('DOMContentLoaded', async () => {
           settings,
           tokenExpired
         }
+      }, () => {
+        const _ = extApi.runtime.lastError;
       });
     }
   }

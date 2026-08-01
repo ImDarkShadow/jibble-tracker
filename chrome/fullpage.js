@@ -3,12 +3,36 @@ import { fetchMonthlyTimesheets, fetchPersonHolidays } from './js/api.js';
 import { calculateMonthSummary, getDaysInMonth, getDayName, isSaturdayWorking } from './js/calculator.js';
 import { renderProgressRing, renderDailyBarChart } from './js/charts.js';
 import { initTheme, applyTheme, getSavedTheme } from './js/theme.js';
+const extApi = typeof browser !== 'undefined' ? browser : (typeof chrome !== 'undefined' ? chrome : null);
 
 function setSafeHTML(targetEl, htmlString) {
   if (!targetEl) return;
+  const tagName = targetEl.tagName ? targetEl.tagName.toLowerCase() : '';
   const parser = new DOMParser();
-  const doc = parser.parseFromString(htmlString, 'text/html');
-  targetEl.replaceChildren(...doc.body.childNodes);
+
+  if (tagName === 'tbody' || tagName === 'tfoot' || tagName === 'thead') {
+    const doc = parser.parseFromString(`<table><${tagName}>${htmlString}</${tagName}></table>`, 'text/html');
+    const container = doc.querySelector(tagName);
+    if (container) {
+      targetEl.replaceChildren(...container.childNodes);
+      return;
+    }
+  } else if (tagName === 'tr') {
+    const doc = parser.parseFromString(`<table><tbody><tr>${htmlString}</tr></tbody></table>`, 'text/html');
+    const tr = doc.querySelector('tr');
+    if (tr) {
+      targetEl.replaceChildren(...tr.childNodes);
+      return;
+    }
+  }
+
+  const doc = parser.parseFromString(`<div>${htmlString}</div>`, 'text/html');
+  const div = doc.body ? doc.body.firstElementChild : null;
+  if (div) {
+    targetEl.replaceChildren(...div.childNodes);
+  } else if (doc.body) {
+    targetEl.replaceChildren(...doc.body.childNodes);
+  }
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -52,6 +76,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const personIdInput = document.getElementById('cfg-person-id');
   const appVersionInput = document.getElementById('cfg-app-version');
   const periodModeSelect = document.getElementById('cfg-period-mode');
+  const monthCalcModeSelect = document.getElementById('cfg-month-calc-mode');
   const badgeMetricSelect = document.getElementById('cfg-badge-metric');
   const notifyTargetMetCb = document.getElementById('cfg-notify-target-met');
   const autoRefreshSessionCb = document.getElementById('cfg-auto-refresh-session');
@@ -116,12 +141,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (appVersionInput) {
       appVersionInput.value = currentSettings.jibbleAppVersion || "2.81.3";
     }
-    if (periodModeSelect) {
-      periodModeSelect.value = currentSettings.periodMode || "month";
-    }
-    if (badgeMetricSelect) {
-      badgeMetricSelect.value = currentSettings.badgeMetric || "total";
-    }
+    if (periodModeSelect) periodModeSelect.value = currentSettings.periodMode || 'month';
+    if (monthCalcModeSelect) monthCalcModeSelect.value = currentSettings.monthCalcMode || 'full';
+    if (badgeMetricSelect) badgeMetricSelect.value = currentSettings.badgeMetric || 'total';
     if (notifyTargetMetCb) {
       notifyTargetMetCb.checked = currentSettings.notifyTargetMet !== false;
     }
@@ -156,6 +178,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     halfDayEnableCb.addEventListener('change', (e) => {
       toggleHalfDayVisibility(e.target.checked);
     });
+
+    if (monthCalcModeSelect) {
+      monthCalcModeSelect.addEventListener('change', async (e) => {
+        await saveSettings({ monthCalcMode: e.target.value });
+        await refreshDashboardData();
+      });
+    }
 
     saveWorkConfigBtn.addEventListener('click', saveWorkConfigurations);
     saveSatConfigBtn.addEventListener('click', saveSaturdayConfigurations);
@@ -228,6 +257,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const personId = personIdInput.value.trim();
     const jibbleAppVersion = appVersionInput.value.trim() || "2.81.3";
     const periodMode = periodModeSelect ? periodModeSelect.value : "month";
+    const monthCalcMode = monthCalcModeSelect ? monthCalcModeSelect.value : "full";
     const badgeMetric = badgeMetricSelect ? badgeMetricSelect.value : "total";
     const notifyTargetMet = notifyTargetMetCb ? notifyTargetMetCb.checked : true;
     const autoRefreshSession = autoRefreshSessionCb ? autoRefreshSessionCb.checked : true;
@@ -236,6 +266,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       personId,
       jibbleAppVersion,
       periodMode,
+      monthCalcMode,
       badgeMetric,
       notifyTargetMet,
       autoRefreshSession
@@ -297,6 +328,8 @@ document.addEventListener('DOMContentLoaded', async () => {
           settings: currentSettings,
           tokenExpired
         }
+      }, () => {
+        const _ = extApi.runtime.lastError;
       });
     }
   }
@@ -475,20 +508,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     const month = parseInt(monthStr, 10);
     const daysInMonth = getDaysInMonth(year, month);
     const result = [];
+    const workingWeekdays = config.workingWeekdays || ["Mon", "Tue", "Wed", "Thu", "Fri"];
 
     for (let d = 1; d <= daysInMonth; d++) {
       const dayPadding = String(d).padStart(2, "0");
       const dateStr = `${yearStr}-${monthStr}-${dayPadding}`;
+      const dayName = getDayName(dateStr);
       const dateObj = new Date(dateStr + "T00:00:00");
       const dayOfWeek = dateObj.getDay();
 
-      if (dayOfWeek === 0) {
-        result.push({
-          date: dateStr,
-          name: "Sunday Weekend",
-          isAuto: true
-        });
-      } else if (dayOfWeek === 6) {
+      if (dayOfWeek === 6) {
         const isWorking = isSaturdayWorking(dateStr, config.saturdayConfig, config.altSatReferenceDate);
         if (!isWorking) {
           result.push({
@@ -497,6 +526,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             isAuto: true
           });
         }
+      } else if (!workingWeekdays.includes(dayName)) {
+        result.push({
+          date: dateStr,
+          name: `${dayName} Off`,
+          isAuto: true
+        });
       }
     }
     return result;

@@ -25,10 +25,14 @@ extApi.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message.type === "UPDATE_BADGE_AND_NOTIFY") {
     handleBadgeAndNotification(message.payload);
+    sendResponse({ success: true });
+    return true;
   }
 
   if (message.type === "SILENT_REFRESH_SESSION") {
     attemptSilentSessionRefresh();
+    sendResponse({ success: true });
+    return true;
   }
 });
 

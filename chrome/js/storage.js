@@ -17,6 +17,7 @@ export const DEFAULT_SETTINGS = {
   manualHolidays: [],
   selectedMonth: new Date().toISOString().slice(0, 7), // "YYYY-MM"
   periodMode: "month", // "month" or "bi_weekly"
+  monthCalcMode: "full", // "full" (entire month) or "mtd" (month-to-date / elapsed)
   badgeMetric: "total", // "total" or "work"
   notifyTargetMet: true,
   notifiedTargetMetDate: "",

@@ -198,17 +198,7 @@ export function getDayType(dateStr, config) {
     };
   }
 
-  // 2. Sunday (Always Weekend)
-  if (dayOfWeek === 0) {
-    return {
-      type: "Weekend",
-      isWorking: false,
-      requiredWorkSecs: 0,
-      allowedBreakSecs: 0
-    };
-  }
-
-  // 3. Saturday
+  // 2. Saturday (special schedule rules)
   if (dayOfWeek === 6) {
     const isWorking = isSaturdayWorking(dateStr, config.saturdayConfig, config.altSatReferenceDate);
     const isAltConfig = ["alt_1_3_work", "alt_2_4_work", "alt_1_3_off", "alt_2_4_off", "ref_date"].includes(config.saturdayConfig);
@@ -241,7 +231,7 @@ export function getDayType(dateStr, config) {
     };
   }
 
-  // 4. Weekday (Mon - Fri)
+  // 3. All other days (Sun, Mon, Tue, Wed, Thu, Fri)
   const workingWeekdays = config.workingWeekdays || ["Mon", "Tue", "Wed", "Thu", "Fri"];
   if (workingWeekdays.includes(dayName)) {
     return {
@@ -250,14 +240,15 @@ export function getDayType(dateStr, config) {
       requiredWorkSecs: (config.targetWorkHours || 8) * 3600,
       allowedBreakSecs: (config.targetBreakHours || 1) * 3600
     };
-  } else {
-    return {
-      type: "Weekend",
-      isWorking: false,
-      requiredWorkSecs: 0,
-      allowedBreakSecs: 0
-    };
   }
+
+  // Non-working weekday or Sunday
+  return {
+    type: "Weekend",
+    isWorking: false,
+    requiredWorkSecs: 0,
+    allowedBreakSecs: 0
+  };
 }
 
 /**
@@ -347,11 +338,21 @@ export function calculateMonthSummary(yearMonthStr, jibbleDailyRecords = [], con
   let monthRequiredTotalSecs = 0;
   let monthActualTotalSecs = 0;
 
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  const localYear = d.getFullYear();
+  const localMonth = String(d.getMonth() + 1).padStart(2, "0");
+  const localDay = String(d.getDate()).padStart(2, "0");
+  const todayStr = `${localYear}-${localMonth}-${localDay}`;
+  const currentYearMonth = todayStr.slice(0, 7);
+
   let todayMetrics = null;
 
-  for (let d = 1; d <= totalDaysInMonth; d++) {
-    const dayPadding = String(d).padStart(2, "0");
+  const isMTD = config.monthCalcMode === "mtd";
+  const isCurrentMonth = yearMonthStr === currentYearMonth;
+  const isFutureMonth = yearMonthStr > currentYearMonth;
+
+  for (let dNum = 1; dNum <= totalDaysInMonth; dNum++) {
+    const dayPadding = String(dNum).padStart(2, "0");
     const dateStr = `${yearStr}-${monthStr}-${dayPadding}`;
 
     const jibbleRecord = recordsMap[dateStr] || null;
@@ -359,11 +360,20 @@ export function calculateMonthSummary(yearMonthStr, jibbleDailyRecords = [], con
 
     dailyList.push(metrics);
 
-    monthRequiredWorkSecs += metrics.requiredWorkSecs;
+    // If Month-to-Date (MTD) mode is enabled:
+    // - For current month: include required hours only for days up to today (dateStr <= todayStr)
+    // - For past months: include all days
+    // - For future months: include 0 days
+    const includeInRequired = !isMTD || (!isFutureMonth && (!isCurrentMonth || dateStr <= todayStr));
+
+    if (includeInRequired) {
+      monthRequiredWorkSecs += metrics.requiredWorkSecs;
+      monthAllowedBreakSecs += metrics.allowedBreakSecs;
+      monthRequiredTotalSecs += metrics.requiredTotalSecs;
+    }
+
     monthActualWorkSecs += metrics.actualWorkSecs;
-    monthAllowedBreakSecs += metrics.allowedBreakSecs;
     monthActualBreakSecs += metrics.actualBreakSecs;
-    monthRequiredTotalSecs += metrics.requiredTotalSecs;
     monthActualTotalSecs += metrics.actualTotalSecs;
 
     if (dateStr === todayStr) {
