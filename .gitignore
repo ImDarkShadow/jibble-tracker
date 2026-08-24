@@ -1,0 +1,9 @@
+node_modules/
+chrome/
+firefox/
+dist/
+*.zip
+*.crx
+*.pem
+.DS_Store
+

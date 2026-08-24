@@ -19,6 +19,7 @@ export const DEFAULT_SETTINGS = {
   periodMode: "month", // "month" or "bi_weekly"
   monthCalcMode: "full", // "full" (entire month) or "mtd" (month-to-date / elapsed)
   badgeMetric: "total", // "total" or "work"
+  notifyMetric: "work", // "work" (Work Time Only) or "total" (Total Time: Work + Break)
   notifyTargetMet: true,
   notifiedTargetMetDate: "",
   autoRefreshSession: true,
@@ -26,10 +27,29 @@ export const DEFAULT_SETTINGS = {
   tokenExpiry: null,
   personId: "",
   autoPersonId: "",
-  jibbleAppVersion: "2.81.3",
+  jibbleAppVersion: "2.82.1",
   cachedHolidays: [],
-  cachedHolidaysTime: 0
+  cachedHolidaysTime: 0,
+  lastDataFetchTime: 0
 };
+
+/**
+ * Compare two semver-like version strings (e.g. "2.81.3" vs "2.82.1")
+ * Returns true if v1 is older than v2
+ */
+export function isVersionOlder(v1, v2) {
+  if (!v1) return true;
+  if (!v2) return false;
+  const p1 = String(v1).split('.').map(n => parseInt(n, 10) || 0);
+  const p2 = String(v2).split('.').map(n => parseInt(n, 10) || 0);
+  for (let i = 0; i < Math.max(p1.length, p2.length); i++) {
+    const a = p1[i] || 0;
+    const b = p2[i] || 0;
+    if (a < b) return true;
+    if (a > b) return false;
+  }
+  return false;
+}
 
 /**
  * Get all stored settings merged with defaults
@@ -55,6 +75,11 @@ export async function getSettings() {
       if (!settings.personId && settings.autoPersonId) {
         settings.personId = settings.autoPersonId;
       }
+      // Auto-upgrade stored jibbleAppVersion if code defaults to a newer version
+      if (!items || !items.jibbleAppVersion || isVersionOlder(items.jibbleAppVersion, DEFAULT_SETTINGS.jibbleAppVersion)) {
+        settings.jibbleAppVersion = DEFAULT_SETTINGS.jibbleAppVersion;
+        extApi.storage.local.set({ jibbleAppVersion: DEFAULT_SETTINGS.jibbleAppVersion });
+      }
       resolve(settings);
     });
   });
@@ -73,19 +98,4 @@ export async function saveSettings(newSettings) {
       resolve(true);
     });
   });
-}
-
-/**
- * Get single key from storage
- */
-export async function getStorageItem(key, defaultValue = null) {
-  const settings = await getSettings();
-  return settings[key] !== undefined ? settings[key] : defaultValue;
-}
-
-/**
- * Save single key to storage
- */
-export async function setStorageItem(key, value) {
-  return saveSettings({ [key]: value });
 }

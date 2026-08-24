@@ -1,5 +1,82 @@
 const extApi = typeof browser !== 'undefined' ? browser : chrome;
 
+// Periodic alarm for live elapsed time updates on badge
+if (extApi.alarms) {
+  extApi.alarms.create("LIVE_TIME_TICK", { periodInMinutes: 1 });
+  extApi.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name === "LIVE_TIME_TICK") {
+      updateLiveBadgeFromStorage();
+    }
+  });
+}
+
+// Update live badge text and color based on elapsed time from last refresh
+async function updateLiveBadgeFromStorage() {
+  try {
+    if (!extApi.storage || !extApi.storage.local) return;
+    const settings = await new Promise(resolve => extApi.storage.local.get(null, resolve));
+    if (!settings || !settings.lastDataFetchTime) return;
+
+    const currentYearMonth = new Date().toISOString().slice(0, 7);
+    const activePersonId = settings.personId || settings.autoPersonId || "";
+    const cacheKey = `timesheets_cache_${activePersonId}_${currentYearMonth}`;
+    const cachedData = settings[cacheKey];
+
+    if (!cachedData || !cachedData.daily) return;
+
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayRecord = cachedData.daily.find(d => d.date === todayStr);
+
+    if (todayRecord && todayRecord.trackedHours) {
+      const lastFetch = settings.lastDataFetchTime || cachedData.time || Date.now();
+      const elapsedSecs = Math.max(0, Math.floor((Date.now() - lastFetch) / 1000));
+
+      // Parse work and break duration
+      let workSecs = 0;
+      if (todayRecord.trackedHours.worked) {
+        const matches = todayRecord.trackedHours.worked.match(/P(?:([0-9]+)D)?T(?:([0-9]+)H)?(?:([0-9]+)M)?(?:([0-9.]+)S)?/);
+        if (matches) {
+          const d = parseInt(matches[1]) || 0;
+          const h = parseInt(matches[2]) || 0;
+          const m = parseInt(matches[3]) || 0;
+          const s = parseFloat(matches[4]) || 0;
+          workSecs = Math.round(d * 86400 + h * 3600 + m * 60 + s);
+        }
+      }
+
+      let breakSecs = 0;
+      if (todayRecord.trackedHours.totalBreakTime) {
+        const matches = todayRecord.trackedHours.totalBreakTime.match(/P(?:([0-9]+)D)?T(?:([0-9]+)H)?(?:([0-9]+)M)?(?:([0-9.]+)S)?/);
+        if (matches) {
+          const d = parseInt(matches[1]) || 0;
+          const h = parseInt(matches[2]) || 0;
+          const m = parseInt(matches[3]) || 0;
+          const s = parseFloat(matches[4]) || 0;
+          breakSecs = Math.round(d * 86400 + h * 3600 + m * 60 + s);
+        }
+      }
+
+      if (workSecs > 0) {
+        const actualWork = workSecs + elapsedSecs;
+        const actualTotal = actualWork + breakSecs;
+        const badgeMetric = settings.badgeMetric || "total";
+        const displaySecs = badgeMetric === "work" ? actualWork : actualTotal;
+
+        const actionApi = extApi.action || extApi.browserAction;
+        if (actionApi && actionApi.setBadgeText) {
+          actionApi.setBadgeText({ text: formatBadgeText(displaySecs) });
+          const targetWorkSecs = (settings.targetWorkHours || 8) * 3600;
+          actionApi.setBadgeBackgroundColor({
+            color: actualWork >= targetWorkSecs ? "#22c55e" : "#3b82f6"
+          });
+        }
+      }
+    }
+  } catch (e) {
+    console.warn("Live badge update error:", e);
+  }
+}
+
 // Listen for messages from content script or popup/dashboard
 extApi.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "FETCH_TIMESHEETS") {
@@ -8,7 +85,7 @@ extApi.runtime.onMessage.addListener((message, sender, sendResponse) => {
         "Authorization": `Bearer ${message.token}`,
         "Accept": "application/json",
         "X-Jibble-App-Language": "en-US",
-        "X-Jibble-App-Version": message.appVersion || "2.81.3"
+        "X-Jibble-App-Version": message.appVersion || "2.82.1"
       }
     })
     .then(response => response.json())
@@ -132,6 +209,7 @@ async function handleBadgeAndNotification(payload) {
   const { todayMetrics, settings, tokenExpired } = payload;
   const autoRefreshSession = (settings && settings.autoRefreshSession) !== false;
   const badgeMetric = (settings && settings.badgeMetric) || "total";
+  const notifyMetric = (settings && settings.notifyMetric) || "work";
   const notifyTargetMet = (settings && settings.notifyTargetMet) !== false;
   const notifiedDate = (settings && settings.notifiedTargetMetDate) || "";
   const notifiedExpired = (settings && settings.notifiedTokenExpired) || false;
@@ -186,15 +264,22 @@ async function handleBadgeAndNotification(payload) {
     actionApi.setBadgeText({ text: badgeText });
   }
 
-  // 4. Daily Target Met Notification
-  if (!tokenExpired && notifyTargetMet && todayMetrics.actualWorkSecs >= todayMetrics.requiredWorkSecs && todayMetrics.requiredWorkSecs > 0) {
+  // 4. Daily Target Met Notification (Configurable Work Time vs Total Time)
+  const isTargetMet = notifyMetric === "total"
+    ? (todayMetrics.actualTotalSecs >= todayMetrics.requiredTotalSecs && todayMetrics.requiredTotalSecs > 0)
+    : (todayMetrics.actualWorkSecs >= todayMetrics.requiredWorkSecs && todayMetrics.requiredWorkSecs > 0);
+
+  const targetFormatted = notifyMetric === "total" ? todayMetrics.formattedRequiredTotal : todayMetrics.formattedRequiredWork;
+  const targetLabel = notifyMetric === "total" ? "total time target" : "work target";
+
+  if (!tokenExpired && notifyTargetMet && isTargetMet) {
     if (notifiedDate !== todayStr) {
       if (extApi.notifications && extApi.notifications.create) {
         extApi.notifications.create(`target_met_${todayStr}`, {
           type: "basic",
           iconUrl: "icons/icon128.png",
           title: "Jibble Target Reached! 🎉",
-          message: `Great job! You reached your required work target (${todayMetrics.formattedRequiredWork}) for today.`,
+          message: `Great job! You reached your required ${targetLabel} (${targetFormatted}) for today.`,
           priority: 2
         });
 

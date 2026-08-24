@@ -78,6 +78,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const periodModeSelect = document.getElementById('cfg-period-mode');
   const monthCalcModeSelect = document.getElementById('cfg-month-calc-mode');
   const badgeMetricSelect = document.getElementById('cfg-badge-metric');
+  const notifyMetricSelect = document.getElementById('cfg-notify-metric');
   const notifyTargetMetCb = document.getElementById('cfg-notify-target-met');
   const autoRefreshSessionCb = document.getElementById('cfg-auto-refresh-session');
   const saveApiConfigBtn = document.getElementById('save-api-config-btn');
@@ -102,6 +103,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   let currentSummary = null;
   let currentSettings = null;
   let currentApiHolidays = [];
+  let currentRawDaily = [];
+  let lastFetchTimestamp = 0;
+  let liveTimerInterval = null;
   let _chartResizeObserver = null;
 
   // Initialize Dashboard
@@ -139,11 +143,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       personIdInput.value = currentSettings.personId || currentSettings.autoPersonId || "";
     }
     if (appVersionInput) {
-      appVersionInput.value = currentSettings.jibbleAppVersion || "2.81.3";
+      appVersionInput.value = currentSettings.jibbleAppVersion || "2.82.1";
     }
     if (periodModeSelect) periodModeSelect.value = currentSettings.periodMode || 'month';
     if (monthCalcModeSelect) monthCalcModeSelect.value = currentSettings.monthCalcMode || 'full';
     if (badgeMetricSelect) badgeMetricSelect.value = currentSettings.badgeMetric || 'total';
+    if (notifyMetricSelect) notifyMetricSelect.value = currentSettings.notifyMetric || 'work';
     if (notifyTargetMetCb) {
       notifyTargetMetCb.checked = currentSettings.notifyTargetMet !== false;
     }
@@ -155,14 +160,55 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupEventListeners();
 
     // Load and Render Data
-    await refreshDashboardData();
+    await refreshDashboardData(false);
+
+    // Live 1-second interval to update today's metrics
+    startLiveDashboardTimer();
+  }
+
+  function adjustMonth(yearMonthStr, delta) {
+    if (!yearMonthStr || !yearMonthStr.includes('-')) {
+      yearMonthStr = new Date().toISOString().slice(0, 7);
+    }
+    let [year, month] = yearMonthStr.split('-').map(Number);
+    month += delta;
+    while (month < 1) {
+      month += 12;
+      year -= 1;
+    }
+    while (month > 12) {
+      month -= 12;
+      year += 1;
+    }
+    return `${year}-${String(month).padStart(2, '0')}`;
   }
 
   function setupEventListeners() {
+    const prevMonthBtn = document.getElementById('dash-prev-month-btn');
+    const nextMonthBtn = document.getElementById('dash-next-month-btn');
+
+    if (prevMonthBtn) {
+      prevMonthBtn.addEventListener('click', async () => {
+        const newMonth = adjustMonth(monthSelect.value, -1);
+        monthSelect.value = newMonth;
+        await saveSettings({ selectedMonth: newMonth });
+        await refreshDashboardData(false);
+      });
+    }
+
+    if (nextMonthBtn) {
+      nextMonthBtn.addEventListener('click', async () => {
+        const newMonth = adjustMonth(monthSelect.value, 1);
+        monthSelect.value = newMonth;
+        await saveSettings({ selectedMonth: newMonth });
+        await refreshDashboardData(false);
+      });
+    }
+
     monthSelect.addEventListener('change', async (e) => {
       const selectedMonth = e.target.value;
       await saveSettings({ selectedMonth });
-      await refreshDashboardData();
+      await refreshDashboardData(false);
     });
 
     refreshBtn.addEventListener('click', () => refreshDashboardData(true));
@@ -182,7 +228,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (monthCalcModeSelect) {
       monthCalcModeSelect.addEventListener('change', async (e) => {
         await saveSettings({ monthCalcMode: e.target.value });
-        await refreshDashboardData();
+        await refreshDashboardData(false);
       });
     }
 
@@ -197,6 +243,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     closeHolidayModalBtn.addEventListener('click', closeHolidayModal);
     cancelHolidayModalBtn.addEventListener('click', closeHolidayModal);
     saveHolidayModalBtn.addEventListener('click', handleSaveHoliday);
+
+    // Listen for background updates
+    if (extApi && extApi.runtime && extApi.runtime.onMessage) {
+      extApi.runtime.onMessage.addListener((message) => {
+        if (message.type === 'TIMESHEET_DATA_REFRESHED') {
+          if (message.payload && message.payload.yearMonth === monthSelect.value) {
+            refreshDashboardData(false);
+          }
+        }
+      });
+    }
   }
 
   function toggleRefDateVisibility(mode) {
@@ -231,7 +288,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     showToast("Work configurations saved successfully!", "success");
-    await refreshDashboardData();
+    await refreshDashboardData(false);
   }
 
   async function saveSaturdayConfigurations() {
@@ -250,15 +307,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     showToast("Saturday schedule updated successfully!", "success");
-    await refreshDashboardData();
+    await refreshDashboardData(false);
   }
 
   async function saveApiConfigurations() {
-    const personId = personIdInput.value.trim();
-    const jibbleAppVersion = appVersionInput.value.trim() || "2.81.3";
+    const personId = personIdInput ? personIdInput.value.trim() : "";
+    const jibbleAppVersion = appVersionInput.value.trim() || "2.82.1";
     const periodMode = periodModeSelect ? periodModeSelect.value : "month";
     const monthCalcMode = monthCalcModeSelect ? monthCalcModeSelect.value : "full";
     const badgeMetric = badgeMetricSelect ? badgeMetricSelect.value : "total";
+    const notifyMetric = notifyMetricSelect ? notifyMetricSelect.value : "work";
     const notifyTargetMet = notifyTargetMetCb ? notifyTargetMetCb.checked : true;
     const autoRefreshSession = autoRefreshSessionCb ? autoRefreshSessionCb.checked : true;
 
@@ -268,18 +326,23 @@ document.addEventListener('DOMContentLoaded', async () => {
       periodMode,
       monthCalcMode,
       badgeMetric,
+      notifyMetric,
       notifyTargetMet,
       autoRefreshSession
     });
 
+    currentSettings = await getSettings();
+
     showToast("Preferences & API settings saved!", "success");
-    await refreshDashboardData();
+    await refreshDashboardData(true);
   }
 
   /**
    * Main Load & Render Data Loop
    */
-  async function refreshDashboardData() {
+  async function refreshDashboardData(forceRefresh = false) {
+    if (refreshBtn) refreshBtn.classList.add('spinning');
+
     currentSettings = await getSettings();
     const yearMonth = monthSelect.value;
 
@@ -294,9 +357,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Fetch live timesheets & company holidays from Jibble API
     const [timesheetRes, holidaysRes] = await Promise.all([
-      fetchMonthlyTimesheets(yearMonth, currentSettings.personId, currentSettings.jibbleAppVersion),
-      fetchPersonHolidays(currentSettings.personId, currentSettings.jibbleAppVersion)
+      fetchMonthlyTimesheets(yearMonth, currentSettings.personId, currentSettings.jibbleAppVersion, forceRefresh),
+      fetchPersonHolidays(currentSettings.personId, currentSettings.jibbleAppVersion, forceRefresh)
     ]);
+
+    if (refreshBtn) refreshBtn.classList.remove('spinning');
 
     if (!timesheetRes.success) {
       showToast(timesheetRes.error || "Failed to fetch timesheet records.", "error");
@@ -306,13 +371,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     currentApiHolidays = holidaysRes.success ? (holidaysRes.holidays || []) : [];
+    currentRawDaily = timesheetRes.daily || [];
+    lastFetchTimestamp = timesheetRes.cachedTime || currentSettings.lastDataFetchTime || Date.now();
 
     const fullConfig = {
       ...currentSettings,
       apiHolidays: currentApiHolidays
     };
 
-    currentSummary = calculateMonthSummary(yearMonth, timesheetRes.daily || [], fullConfig);
+    const elapsed = Math.max(0, Math.floor((Date.now() - lastFetchTimestamp) / 1000));
+    currentSummary = calculateMonthSummary(yearMonth, currentRawDaily, fullConfig, elapsed);
 
     renderKPIs(currentSummary);
     renderCharts(currentSummary);
@@ -332,6 +400,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         const _ = extApi.runtime.lastError;
       });
     }
+  }
+
+  function startLiveDashboardTimer() {
+    if (liveTimerInterval) clearInterval(liveTimerInterval);
+    liveTimerInterval = setInterval(() => {
+      if (!currentRawDaily || currentRawDaily.length === 0 || !currentSettings) return;
+      const elapsed = Math.max(0, Math.floor((Date.now() - lastFetchTimestamp) / 1000));
+      const fullConfig = {
+        ...currentSettings,
+        apiHolidays: currentApiHolidays
+      };
+      currentSummary = calculateMonthSummary(monthSelect.value, currentRawDaily, fullConfig, elapsed);
+      renderKPIs(currentSummary);
+      renderDailyLogTable(currentSummary);
+    }, 1000);
   }
 
   function showDashNotice(message) {
@@ -358,18 +441,18 @@ document.addEventListener('DOMContentLoaded', async () => {
    * Render Top KPI Cards
    */
   function renderKPIs(summary) {
-    // 1. Completion Percentage — based on Total (Work + Break)
-    const targetTotalSecs = summary.monthRequiredTotalSecs;
-    const actualTotalSecs = summary.monthActualTotalSecs;
-    const completionPercent = targetTotalSecs > 0 ? (actualTotalSecs / targetTotalSecs) * 100 : 100;
+    // 1. Completion Percentage — based on Work Target
+    const targetWorkSecs = summary.monthRequiredWorkSecs;
+    const actualWorkSecs = summary.monthActualWorkSecs;
+    const workPercent = targetWorkSecs > 0 ? (actualWorkSecs / targetWorkSecs) * 100 : 100;
 
     const ringContainer = document.getElementById('kpi-ring-container');
     renderProgressRing(
       ringContainer,
-      completionPercent,
-      summary.monthTotalStatus,
-      "of target",
-      `${summary.formattedMonthActualTotal} / ${summary.formattedMonthRequiredTotal}`
+      workPercent,
+      summary.monthWorkStatus,
+      "Target",
+      `${summary.formattedMonthActualWork} / ${summary.formattedMonthRequiredWork}`
     );
 
     // 2. Work Target Balance
@@ -380,6 +463,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     workTag.textContent = summary.formattedMonthWorkDiff;
     workTag.className = `kpi-tag ${summary.monthWorkStatus}`;
 
+    const workBar = document.getElementById('kpi-work-bar');
+    if (workBar) {
+      workBar.style.width = `${Math.min(100, Math.round(workPercent))}%`;
+      workBar.className = `progress-bar-fill ${summary.monthWorkStatus === 'green' ? 'success' : 'accent'}`;
+    }
+
     // 3. Break Time Usage
     document.getElementById('kpi-break-actual').textContent = summary.formattedMonthActualBreak;
     document.getElementById('kpi-break-req').textContent = summary.formattedMonthAllowedBreak;
@@ -388,6 +477,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     breakTag.textContent = summary.formattedMonthBreakDiff;
     breakTag.className = `kpi-tag ${summary.monthBreakStatus}`;
 
+    const breakBar = document.getElementById('kpi-break-bar');
+    if (breakBar) {
+      const breakPct = summary.monthAllowedBreakSecs > 0
+        ? Math.min(100, Math.round((summary.monthActualBreakSecs / summary.monthAllowedBreakSecs) * 100))
+        : 0;
+      breakBar.style.width = `${breakPct}%`;
+      breakBar.className = `progress-bar-fill ${summary.monthBreakStatus === 'green' ? 'success' : 'accent'}`;
+    }
+
     // 4. Net Total Status
     document.getElementById('kpi-total-actual').textContent = summary.formattedMonthActualTotal;
     document.getElementById('kpi-total-req').textContent = summary.formattedMonthRequiredTotal;
@@ -395,6 +493,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     const totalTag = document.getElementById('kpi-total-diff-tag');
     totalTag.textContent = summary.formattedMonthTotalDiff;
     totalTag.className = `kpi-tag ${summary.monthTotalStatus}`;
+
+    const totalBar = document.getElementById('kpi-total-bar');
+    if (totalBar) {
+      const totalPct = summary.monthRequiredTotalSecs > 0
+        ? Math.min(100, Math.round((summary.monthActualTotalSecs / summary.monthRequiredTotalSecs) * 100))
+        : 0;
+      totalBar.style.width = `${totalPct}%`;
+      totalBar.className = `progress-bar-fill ${summary.monthTotalStatus === 'green' ? 'success' : 'accent'}`;
+    }
   }
 
   /**
@@ -428,7 +535,7 @@ document.addEventListener('DOMContentLoaded', async () => {
    * Render Off Days & Holidays Management Table
    */
   function renderHolidaysTable(yearMonth) {
-    holidayTbody.innerHTML = "";
+    holidayTbody.replaceChildren();
 
     const manualHolidays = currentSettings.manualHolidays || [];
     const monthManual = manualHolidays

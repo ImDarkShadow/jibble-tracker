@@ -82,12 +82,16 @@ export async function getJibbleToken() {
  */
 export async function fetchMonthlyTimesheets(yearMonthStr, personId = null, appVersion = null, forceRefresh = false) {
   const settings = await getSettings();
-  const cacheKey = `timesheets_cache_${yearMonthStr}`;
+  const activePersonId = personId || settings.personId || settings.autoPersonId || "";
+  const cacheKey = `timesheets_cache_${activePersonId}_${yearMonthStr}`;
 
   // Serve cached timesheet instantly if available and not forced
   if (!forceRefresh && settings[cacheKey] && settings[cacheKey].daily) {
-    // Background fetch fresh data asynchronously
-    fetchAndCacheFreshTimesheets(yearMonthStr, personId, appVersion, cacheKey).catch(() => {});
+    // Background fetch fresh data asynchronously if cache is older than 5 minutes
+    const cacheAge = Date.now() - (settings[cacheKey].time || 0);
+    if (cacheAge > 5 * 60 * 1000) {
+      fetchAndCacheFreshTimesheets(yearMonthStr, activePersonId, appVersion, cacheKey).catch(() => {});
+    }
     return {
       success: true,
       daily: settings[cacheKey].daily,
@@ -96,7 +100,7 @@ export async function fetchMonthlyTimesheets(yearMonthStr, personId = null, appV
     };
   }
 
-  return await fetchAndCacheFreshTimesheets(yearMonthStr, personId, appVersion, cacheKey);
+  return await fetchAndCacheFreshTimesheets(yearMonthStr, activePersonId, appVersion, cacheKey);
 }
 
 async function fetchAndCacheFreshTimesheets(yearMonthStr, personId, appVersion, cacheKey) {
@@ -110,7 +114,7 @@ async function fetchAndCacheFreshTimesheets(yearMonthStr, personId, appVersion, 
 
   const settings = await getSettings();
   const activePersonId = personId || settings.personId || settings.autoPersonId || "";
-  const activeAppVersion = appVersion || settings.jibbleAppVersion || "2.81.3";
+  const activeAppVersion = appVersion || settings.jibbleAppVersion || "2.82.1";
 
   if (!activePersonId) {
     return {
@@ -154,18 +158,31 @@ async function fetchAndCacheFreshTimesheets(yearMonthStr, personId, appVersion, 
     }
 
     const daily = (responseData && responseData.value && responseData.value[0] && responseData.value[0].daily) ? responseData.value[0].daily : [];
+    const nowTime = Date.now();
 
     // Cache response in storage
     await saveSettings({
       [cacheKey]: {
         daily,
-        time: Date.now()
-      }
+        time: nowTime
+      },
+      lastDataFetchTime: nowTime
     });
+
+    // Notify any active views (popup or fullpage dashboard)
+    if (extApi && extApi.runtime && extApi.runtime.sendMessage) {
+      extApi.runtime.sendMessage({
+        type: "TIMESHEET_DATA_REFRESHED",
+        payload: { yearMonth: yearMonthStr, daily, time: nowTime }
+      }, () => {
+        const _ = extApi.runtime.lastError;
+      });
+    }
 
     return {
       success: true,
       daily,
+      cachedTime: nowTime,
       raw: responseData
     };
   } catch (error) {
@@ -204,7 +221,7 @@ export async function fetchPersonHolidays(personId = null, appVersion = null, fo
 
   const activePersonId = personId || settings.personId || settings.autoPersonId || "";
   if (!activePersonId) return { success: true, holidays: settings.cachedHolidays || [] };
-  const activeAppVersion = appVersion || settings.jibbleAppVersion || "2.81.3";
+  const activeAppVersion = appVersion || settings.jibbleAppVersion || "2.82.1";
   const url = `https://workspace.prod.jibble.io/v1/PersonHolidays(personId=${activePersonId})`;
 
   try {

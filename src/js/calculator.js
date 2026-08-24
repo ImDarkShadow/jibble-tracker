@@ -161,8 +161,8 @@ export function isSaturdayWorking(dateStr, saturdayConfig, altSatReferenceDate) 
       const current = new Date(dateStr + "T00:00:00");
       const ref = new Date(altSatReferenceDate + "T00:00:00");
       const diffTime = current.getTime() - ref.getTime();
-      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-      return diffDays % 14 === 0;
+      const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+      return Math.abs(diffDays) % 14 === 0;
 
     default:
       return false;
@@ -202,11 +202,10 @@ export function getDayType(dateStr, config) {
   if (dayOfWeek === 6) {
     const isWorking = isSaturdayWorking(dateStr, config.saturdayConfig, config.altSatReferenceDate);
     const isAltConfig = ["alt_1_3_work", "alt_2_4_work", "alt_1_3_off", "alt_2_4_off", "ref_date"].includes(config.saturdayConfig);
-    const dayTypeLabel = isAltConfig ? "Alternate Saturday" : (isWorking ? "Working Day" : "Weekend");
 
     if (!isWorking) {
       return {
-        type: dayTypeLabel,
+        type: "Weekend",
         isWorking: false,
         requiredWorkSecs: 0,
         allowedBreakSecs: 0
@@ -224,7 +223,7 @@ export function getDayType(dateStr, config) {
     }
 
     return {
-      type: dayTypeLabel,
+      type: isAltConfig ? "Alternate Saturday" : "Working Day",
       isWorking: true,
       requiredWorkSecs: (config.targetWorkHours || 8) * 3600,
       allowedBreakSecs: (config.targetBreakHours || 1) * 3600
@@ -254,25 +253,30 @@ export function getDayType(dateStr, config) {
 /**
  * Compute metrics for a single calendar day
  */
-export function calculateDayMetrics(dateStr, jibbleRecord, config) {
+export function calculateDayMetrics(dateStr, jibbleRecord, config, liveElapsedSecs = 0) {
   const dayName = getDayName(dateStr);
   const dayTypeInfo = getDayType(dateStr, config);
 
-  const actualWorkSecs = jibbleRecord ? parseISOduration(jibbleRecord.trackedHours?.worked).totalSeconds : 0;
+  let rawWorkSecs = jibbleRecord ? parseISOduration(jibbleRecord.trackedHours?.worked).totalSeconds : 0;
   const actualBreakSecs = jibbleRecord ? parseISOduration(jibbleRecord.trackedHours?.totalBreakTime).totalSeconds : 0;
+
+  // Add live elapsed time since last sync if tracking is active
+  const elapsed = (rawWorkSecs > 0) ? Math.max(0, parseInt(liveElapsedSecs, 10) || 0) : 0;
+  const actualWorkSecs = rawWorkSecs + elapsed;
 
   const requiredWorkSecs = dayTypeInfo.requiredWorkSecs;
   const allowedBreakSecs = dayTypeInfo.allowedBreakSecs;
 
   const workDiffSecs = actualWorkSecs - requiredWorkSecs;
-  const breakDiffSecs = actualBreakSecs - allowedBreakSecs;
+  // Break in hand = Allowed break - Actual break (positive means break remaining in hand)
+  const breakDiffSecs = allowedBreakSecs - actualBreakSecs;
 
   const requiredTotalSecs = requiredWorkSecs + allowedBreakSecs;
   const actualTotalSecs = actualWorkSecs + actualBreakSecs;
   const totalDiffSecs = actualTotalSecs - requiredTotalSecs;
 
   const workStatus = actualWorkSecs >= requiredWorkSecs ? "green" : "red";
-  const breakStatus = actualBreakSecs <= allowedBreakSecs ? "green" : "red";
+  const breakStatus = breakDiffSecs >= 0 ? "green" : "red";
   const totalStatus = actualTotalSecs >= requiredTotalSecs ? "green" : "red";
 
   return {
@@ -309,14 +313,15 @@ export function calculateDayMetrics(dateStr, jibbleRecord, config) {
     formattedActualTotal: formatDuration(actualTotalSecs),
     formattedTotalDiff: formatDuration(totalDiffSecs, { showSign: true }),
 
-    rawRecord: jibbleRecord || null
+    rawRecord: jibbleRecord || null,
+    liveElapsedSecs: elapsed
   };
 }
 
 /**
  * Compute full monthly summary for selected month
  */
-export function calculateMonthSummary(yearMonthStr, jibbleDailyRecords = [], config = {}) {
+export function calculateMonthSummary(yearMonthStr, jibbleDailyRecords = [], config = {}, liveElapsedSecs = 0) {
   const [yearStr, monthStr] = yearMonthStr.split("-");
   const year = parseInt(yearStr, 10);
   const month = parseInt(monthStr, 10);
@@ -356,7 +361,9 @@ export function calculateMonthSummary(yearMonthStr, jibbleDailyRecords = [], con
     const dateStr = `${yearStr}-${monthStr}-${dayPadding}`;
 
     const jibbleRecord = recordsMap[dateStr] || null;
-    const metrics = calculateDayMetrics(dateStr, jibbleRecord, config);
+    const isToday = dateStr === todayStr;
+    const dayElapsed = isToday ? (liveElapsedSecs || 0) : 0;
+    const metrics = calculateDayMetrics(dateStr, jibbleRecord, config, dayElapsed);
 
     dailyList.push(metrics);
 
@@ -376,22 +383,23 @@ export function calculateMonthSummary(yearMonthStr, jibbleDailyRecords = [], con
     monthActualBreakSecs += metrics.actualBreakSecs;
     monthActualTotalSecs += metrics.actualTotalSecs;
 
-    if (dateStr === todayStr) {
+    if (isToday) {
       todayMetrics = metrics;
     }
   }
 
   if (!todayMetrics) {
     const jibbleTodayRecord = recordsMap[todayStr] || null;
-    todayMetrics = calculateDayMetrics(todayStr, jibbleTodayRecord, config);
+    todayMetrics = calculateDayMetrics(todayStr, jibbleTodayRecord, config, liveElapsedSecs);
   }
 
   const monthWorkDiffSecs = monthActualWorkSecs - monthRequiredWorkSecs;
-  const monthBreakDiffSecs = monthActualBreakSecs - monthAllowedBreakSecs;
+  // Month break in hand = allowed - actual (positive = break remaining in hand)
+  const monthBreakDiffSecs = monthAllowedBreakSecs - monthActualBreakSecs;
   const monthTotalDiffSecs = monthActualTotalSecs - monthRequiredTotalSecs;
 
   const monthWorkStatus = monthActualWorkSecs >= monthRequiredWorkSecs ? "green" : "red";
-  const monthBreakStatus = monthActualBreakSecs <= monthAllowedBreakSecs ? "green" : "red";
+  const monthBreakStatus = monthBreakDiffSecs >= 0 ? "green" : "red";
   const monthTotalStatus = monthActualTotalSecs >= monthRequiredTotalSecs ? "green" : "red";
 
   return {

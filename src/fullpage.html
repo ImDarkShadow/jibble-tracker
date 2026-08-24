@@ -16,18 +16,24 @@
 
   <div class="dashboard-container">
 
-    <!-- ── Header ── -->
+    <!-- ── Modern Command Center Header ── -->
     <header class="dash-header">
       <div class="header-left">
         <div class="dash-logo" aria-hidden="true">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="10"></circle>
             <polyline points="12 6 12 12 16 14"></polyline>
           </svg>
         </div>
         <div>
-          <h1 class="dash-title">Work Tracker for Jibble</h1>
-          <p class="dash-subtitle">Attendance analytics, target tracking &amp; off-day management</p>
+          <div class="dash-title-row">
+            <h1 class="dash-title">Work Tracker</h1>
+            <span class="status-badge success" id="dash-sync-badge">
+              <span class="live-dot"></span>
+              <span id="dash-sync-text">Live Sync</span>
+            </span>
+          </div>
+          <p class="dash-subtitle">Attendance analytics, target pacing &amp; schedule management</p>
         </div>
       </div>
 
@@ -48,18 +54,25 @@
           </button>
         </div>
 
-        <!-- Month picker -->
-        <div class="dash-month-picker">
-          <label for="dash-month-select">Month</label>
-          <input type="month" id="dash-month-select" class="month-input-lg" aria-label="Select month">
+        <!-- Month Navigation -->
+        <div class="dash-month-nav">
+          <button id="dash-prev-month-btn" class="nav-month-btn" title="Previous Month" aria-label="Previous Month">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          </button>
+          <div class="dash-month-picker">
+            <input type="month" id="dash-month-select" class="month-input-lg" aria-label="Select month">
+          </div>
+          <button id="dash-next-month-btn" class="nav-month-btn" title="Next Month" aria-label="Next Month">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </button>
         </div>
 
-        <button id="dash-refresh-btn" class="btn-secondary-dash" aria-label="Refresh data">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <button id="dash-refresh-btn" class="btn-primary-dash" aria-label="Refresh data">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path>
             <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
           </svg>
-          Refresh
+          <span id="dash-refresh-text">Refresh</span>
         </button>
       </div>
     </header>
@@ -67,54 +80,71 @@
     <!-- Expiry / Notice Banner -->
     <div id="dash-notice-banner" class="dash-notice-banner error hidden" role="alert"></div>
 
-    <!-- ── KPI Cards ── -->
-    <section aria-label="Key metrics" class="kpi-grid">
+    <!-- ── KPI Command Center ── -->
+    <section aria-label="Key performance metrics" class="kpi-grid">
 
-      <!-- Completion ring -->
-      <div class="kpi-card">
+      <!-- 1. Completion Ring Card -->
+      <div class="kpi-card highlight-ring">
         <div class="kpi-header">
-          <span class="kpi-title">Total Completion</span>
-          <svg class="kpi-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+          <span class="kpi-title">Monthly Progress</span>
+          <span class="kpi-icon-badge">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+          </span>
         </div>
         <div class="kpi-body" id="kpi-ring-container" aria-label="Work completion ring"></div>
       </div>
 
-      <!-- Work balance -->
+      <!-- 2. Work Target Balance -->
       <div class="kpi-card">
         <div class="kpi-header">
-          <span class="kpi-title">Work Balance</span>
-          <svg class="kpi-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+          <span class="kpi-title">Work Target Balance</span>
+          <span class="kpi-icon-badge">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+          </span>
         </div>
         <div class="kpi-stat">
           <div class="kpi-value tabular" id="kpi-work-actual">—</div>
           <div class="kpi-sub">Target: <span id="kpi-work-req">—</span></div>
           <div class="kpi-tag" id="kpi-work-diff-tag">—</div>
+          <div class="progress-bar-track" style="margin-top: 6px;">
+            <div class="progress-bar-fill accent" id="kpi-work-bar" style="width: 0%;"></div>
+          </div>
         </div>
       </div>
 
-      <!-- Break usage -->
+      <!-- 3. Break in Hand -->
       <div class="kpi-card">
         <div class="kpi-header">
-          <span class="kpi-title">Break Usage</span>
-          <svg class="kpi-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 8h1a4 4 0 0 1 0 8h-1"></path><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path><line x1="6" y1="1" x2="6" y2="4"></line><line x1="10" y1="1" x2="10" y2="4"></line><line x1="14" y1="1" x2="14" y2="4"></line></svg>
+          <span class="kpi-title">Break in Hand</span>
+          <span class="kpi-icon-badge">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 8h1a4 4 0 0 1 0 8h-1"></path><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path><line x1="6" y1="1" x2="6" y2="4"></line><line x1="10" y1="1" x2="10" y2="4"></line><line x1="14" y1="1" x2="14" y2="4"></line></svg>
+          </span>
         </div>
         <div class="kpi-stat">
           <div class="kpi-value tabular" id="kpi-break-actual">—</div>
           <div class="kpi-sub">Allowed: <span id="kpi-break-req">—</span></div>
           <div class="kpi-tag" id="kpi-break-diff-tag">—</div>
+          <div class="progress-bar-track" style="margin-top: 6px;">
+            <div class="progress-bar-fill success" id="kpi-break-bar" style="width: 0%;"></div>
+          </div>
         </div>
       </div>
 
-      <!-- Net total -->
+      <!-- 4. Net Attendance Total -->
       <div class="kpi-card">
         <div class="kpi-header">
-          <span class="kpi-title">Net Total</span>
-          <svg class="kpi-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+          <span class="kpi-title">Net Attendance Total</span>
+          <span class="kpi-icon-badge">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+          </span>
         </div>
         <div class="kpi-stat">
           <div class="kpi-value tabular" id="kpi-total-actual">—</div>
           <div class="kpi-sub">Required: <span id="kpi-total-req">—</span></div>
           <div class="kpi-tag" id="kpi-total-diff-tag">—</div>
+          <div class="progress-bar-track" style="margin-top: 6px;">
+            <div class="progress-bar-fill" id="kpi-total-bar" style="width: 0%;"></div>
+          </div>
         </div>
       </div>
 
@@ -251,11 +281,18 @@
               <option value="work">Work Time Only</option>
             </select>
           </div>
+          <div class="form-group flex-1">
+            <label for="cfg-notify-metric">Notification Target Trigger</label>
+            <select id="cfg-notify-metric">
+              <option value="work">Work Time Only</option>
+              <option value="total">Total Time (Work+Break)</option>
+            </select>
+          </div>
         </div>
 
         <div class="form-group">
           <label for="cfg-app-version">X-Jibble-App-Version Header</label>
-          <input type="text" id="cfg-app-version" placeholder="2.81.3">
+          <input type="text" id="cfg-app-version" placeholder="2.82.1">
         </div>
 
         <div class="checkbox-group" style="margin-bottom:12px; flex-direction:column; gap:8px;">
@@ -265,7 +302,7 @@
           </label>
           <label>
             <input type="checkbox" id="cfg-notify-target-met" checked>
-            Notify when daily work target is reached
+            Notify when daily target is reached
           </label>
         </div>
 

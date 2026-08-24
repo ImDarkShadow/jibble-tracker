@@ -20,6 +20,7 @@ async function syncTokenFromPage() {
     if (token) {
       updateObj.cachedJibbleToken = token;
       updateObj.tokenExpiry = oidcData.expires_at || null;
+      updateObj.notifiedTokenExpired = false;
     }
 
     if (prsid) {
@@ -42,32 +43,25 @@ async function syncTokenFromPage() {
   }
 }
 
-// Initial sync
+// 1. Initial sync immediately on injection
 syncTokenFromPage();
 
-// Re-sync every 2 minutes
-setInterval(() => {
-  syncTokenFromPage();
-}, 2 * 60 * 1000);
-
-// Inject page context script if web_accessible_resources exists
-try {
-  const script = document.createElement("script");
-  script.src = extApi.runtime.getURL("page-fetch.js");
-  (document.head || document.documentElement).appendChild(script);
-  script.onload = () => script.remove();
-} catch (e) {
-  // Ignore if script injection is not permitted on non-jibble subdomains
-}
-
-// Receive page-fetch responses
-window.addEventListener("message", (event) => {
-  if (event.source !== window) return;
-
-  if (event.data?.type === "JIBBLE_TIMESHEET_RESULT") {
-    extApi.runtime.sendMessage({
-      type: "TIMESHEET_RESULT",
-      data: event.data.data
-    });
+// 2. Instant sync when Jibble SPA writes/refreshes token in localStorage
+window.addEventListener("storage", (e) => {
+  if (!e.key || e.key.startsWith("oidc.user:https://identity.prod.jibble.io")) {
+    syncTokenFromPage();
   }
 });
+
+// 3. Instant sync on tab visibility change or focus
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") {
+    syncTokenFromPage();
+  }
+});
+window.addEventListener("focus", syncTokenFromPage);
+
+// 4. Polling every 10 seconds (reduced from 2 minutes)
+setInterval(() => {
+  syncTokenFromPage();
+}, 10 * 1000);

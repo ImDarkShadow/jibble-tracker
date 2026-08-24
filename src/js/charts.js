@@ -43,11 +43,11 @@ function setSafeHTML(targetEl, htmlString) {
 /**
  * Render an SVG circular progress ring.
  */
-export function renderProgressRing(containerEl, percentage, status = 'green', label = '', detail = '') {
+export function renderProgressRing(containerEl, percentage, status = 'green', label = 'Target', detail = '') {
   if (!containerEl) return;
 
   const pct    = Math.min(Math.max(percentage || 0, 0), 100);
-  const R      = 34;
+  const R      = 42;
   const SW     = 7;
   const nr     = R - SW / 2;
   const circ   = 2 * Math.PI * nr;
@@ -63,15 +63,15 @@ export function renderProgressRing(containerEl, percentage, status = 'green', la
   const subTextColor = cssVar('--text-tertiary') || '#4e5a6a';
 
   const html = `
-    <div style="display:flex;flex-direction:column;align-items:center;gap:6px;">
+    <div style="display:flex;flex-direction:column;align-items:center;gap:6px;width:100%;">
       <div class="ring-chart-wrapper">
-        <svg width="80" height="80" viewBox="0 0 72 72" aria-hidden="true">
-          <circle cx="36" cy="36" r="${nr}" fill="none" stroke="${trackColor}" stroke-width="${SW}"/>
-          <circle cx="36" cy="36" r="${nr}" fill="none"
+        <svg width="92" height="92" viewBox="0 0 92 92" aria-hidden="true">
+          <circle cx="46" cy="46" r="${nr}" fill="none" stroke="${trackColor}" stroke-width="${SW}"/>
+          <circle cx="46" cy="46" r="${nr}" fill="none"
             stroke="${fillColor}" stroke-width="${SW}" stroke-linecap="round"
             stroke-dasharray="${circ} ${circ}"
             stroke-dashoffset="${offset}"
-            transform="rotate(-90 36 36)"
+            transform="rotate(-90 46 46)"
             style="transition: stroke-dashoffset 0.7s cubic-bezier(0.4,0,0.2,1);"/>
         </svg>
         <div class="ring-text">
@@ -187,7 +187,8 @@ export function renderDailyBarChart(containerEl, dailyList) {
     }
 
     /* bars */
-    if (isOff) {
+    const hasActivity = (day.actualWorkSecs > 0 || day.actualBreakSecs > 0);
+    if (isOff && !hasActivity) {
       /* off-day tick */
       const tickW = Math.min(barAreaW, barW * 3 + barGap * 2);
       bars += `<rect
